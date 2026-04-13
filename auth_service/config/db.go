@@ -14,9 +14,8 @@ var DB *pgxpool.Pool
 
 func DBConnect() *pgxpool.Pool {
 	driver := helper.ENV("DB_DRIVER")
-
 	if driver != "postgres" {
-		log.Fatal("❌ pgx faqat PostgreSQL bilan ishlaydi (DB_DRIVER=postgres)")
+		log.Fatal("❌ pgx faqat PostgreSQL bilan ishlaydi")
 	}
 
 	dsn := fmt.Sprintf(
@@ -24,42 +23,40 @@ func DBConnect() *pgxpool.Pool {
 		helper.ENV("DB_USER"),
 		helper.ENV("DB_PASSWORD"),
 		helper.ENV("DB_HOST"),
-		helper.ENV("DB_PORT"),
+		helper.ENV("DB_PORT"), // ← 6432 (PgBouncer)
 		helper.ENV("DB_NAME"),
 		helper.ENV("DB_SSLMODE"),
 		helper.ENV("DB_TIMEZONE"),
 	)
 
-	ctx := context.Background()
-
-	config, err := pgxpool.ParseConfig(dsn)
-	if err != nil {
-		log.Fatal("❌ DSN parse error:", err)
-	}
-
-	// 🔥 Pool settings (MUHIM)
-	config.MaxConns = 20
-	config.MinConns = 5
-	config.MaxConnLifetime = time.Hour
-	config.MaxConnIdleTime = 30 * time.Minute
-
-	db, err := pgxpool.NewWithConfig(ctx, config)
+	cfg, err := pgxpool.ParseConfig(dsn)
 	{
 		if err != nil {
-			log.Fatal("❌ Failed to connect to PostgreSQL:", err)
+			log.Fatal("❌ DSN parse error:", err)
 		}
 	}
 
-	// Ping
-	if err := db.Ping(ctx); err != nil {
+	cfg.MaxConns = 10 // PgBouncer allaqachon pool qiladi, shuning uchun past
+	cfg.MinConns = 2
+	cfg.MaxConnLifetime = time.Hour
+	cfg.MaxConnIdleTime = 30 * time.Minute
+	cfg.HealthCheckPeriod = time.Minute
+
+	db, err := pgxpool.NewWithConfig(context.Background(), cfg)
+	{
+		if err != nil {
+			log.Fatal("❌ Failed to connect:", err)
+		}
+	}
+
+	if err := db.Ping(context.Background()); err != nil {
 		log.Fatal("❌ DB ping error:", err)
 	}
 
-	log.Println("✅ Connected to PostgreSQL (pgxpool) 🚀")
+	log.Println("✅ Connected to PostgreSQL via PgBouncer 🚀")
 
 	DB = db
-
-	RunMigrations()           // agar kerak bo‘lsa qo‘shamiz
-	RunRolePermissionSeeder() // agar kerak bo‘lsa qo‘shamiz
+	RunMigrations()
+	RunRolePermissionSeeder()
 	return db
 }

@@ -1,6 +1,7 @@
 package controllers
 
 import (
+	"auth_service/clickhouse"
 	"auth_service/config"
 	"auth_service/helper"
 	"auth_service/request"
@@ -110,12 +111,32 @@ func (c *AuthController) SyncPermissions(w http.ResponseWriter, r *http.Request,
 func (c *AuthController) CheckPermission(w http.ResponseWriter, r *http.Request, _ httprouter.Params) {
 
 	var req request.CheckPermissionRequest
-	DecodeJSON(r, &req)
+	if err := DecodeJSON(r, &req); err != nil {
+		JSON(w, 400, "invalid request body")
+		return
+	}
 
-	permissionName := req.Method + " " + req.Path
+	ip := r.RemoteAddr
+	if forwarded := r.Header.Get("X-Forwarded-For"); forwarded != "" {
+		ip = forwarded
+	}
+
+	// helper: response qaytarishdan oldin log yozadi
+	audit := func(allowed bool, statusCode int) {
+		clickhouse.LogPermissionCheck(clickhouse.AuditEvent{
+			UserID:     uint64(req.UserID),
+			RoleID:     uint64(req.RoleID),
+			Permission: req.Method + " " + req.Path,
+			Method:     req.Method,
+			Path:       req.Path,
+			Allowed:    allowed,
+			StatusCode: statusCode,
+			IP:         ip,
+			UserAgent:  r.Header.Get("User-Agent"),
+		})
+	}
 
 	var exists bool
-
 	err := config.DB.QueryRow(context.Background(), `
 		SELECT EXISTS (
 			SELECT 1
@@ -124,14 +145,20 @@ func (c *AuthController) CheckPermission(w http.ResponseWriter, r *http.Request,
 			WHERE rp.role_id = $1
 			AND p.name = $2
 		)
-	`, req.RoleID, permissionName).Scan(&exists)
+	`, req.RoleID, req.Method+" "+req.Path).Scan(&exists)
 
 	if err != nil {
-		JSON(w, 500, err.Error())
+		audit(false, 500)
+		JSON(w, 500, "database error")
 		return
 	}
 
-	JSON(w, 200, map[string]bool{
-		"allowed": exists,
-	})
+	if !exists {
+		audit(false, 403)
+		JSON(w, 403, map[string]bool{"allowed": false})
+		return
+	}
+
+	audit(true, 200)
+	JSON(w, 200, map[string]bool{"allowed": true})
 }
