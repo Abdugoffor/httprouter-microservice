@@ -59,7 +59,7 @@ func DBConnect() *pgxpool.Pool {
 
 	DB = db
 
-	RunMigrations() // agar kerak bo‘lsa qo‘shamiz
-
+	RunMigrations()           // agar kerak bo‘lsa qo‘shamiz
+	RunRolePermissionSeeder() // agar kerak bo‘lsa qo‘shamiz
 	return db
 }

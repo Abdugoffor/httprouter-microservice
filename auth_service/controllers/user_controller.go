@@ -7,7 +7,6 @@ import (
 	response "auth_service/responce"
 	"auth_service/services"
 	"context"
-	"fmt"
 	"net/http"
 	"strings"
 
@@ -112,7 +111,7 @@ func (c *AuthController) CheckPermission(w http.ResponseWriter, r *http.Request,
 
 	var req request.CheckPermissionRequest
 	DecodeJSON(r, &req)
-	fmt.Println(req)
+
 	permissionName := req.Method + " " + req.Path
 
 	var exists bool
@@ -126,7 +125,7 @@ func (c *AuthController) CheckPermission(w http.ResponseWriter, r *http.Request,
 			AND p.name = $2
 		)
 	`, req.RoleID, permissionName).Scan(&exists)
-	fmt.Println(exists, permissionName)
+
 	if err != nil {
 		JSON(w, 500, err.Error())
 		return

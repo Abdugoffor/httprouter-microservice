@@ -3,10 +3,9 @@ package middleware
 import (
 	"bytes"
 	"encoding/json"
-	"fmt"
 	"net/http"
-	"shop_service/helper"
 	"shop_service/appctx"
+	"shop_service/helper"
 	"strings"
 
 	"github.com/golang-jwt/jwt/v5"
@@ -132,8 +131,6 @@ func AuthRequired(next httprouter.Handle) httprouter.Handle {
 			"method":  r.Method,
 			"path":    routePath,
 		}
-
-		fmt.Println(body)
 
 		jsonBody, _ := json.Marshal(body)
 

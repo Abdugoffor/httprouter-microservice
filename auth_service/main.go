@@ -19,9 +19,9 @@ func main() {
 
 	log.Println("🚀 Server running on :8080")
 
-	for _, route := range router.Routes {
-		log.Println(route.Method, route.Path)
-	}
+	// for _, route := range router.Routes {
+	// 	log.Println(route.Method, route.Path)
+	// }
 
 	log.Fatal(http.ListenAndServe(":8080", router.Router))
 }
