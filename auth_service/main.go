@@ -4,6 +4,8 @@ import (
 	"auth_service/clickhouse"
 	"auth_service/config"
 	"auth_service/helper"
+	"auth_service/kafka"
+	"auth_service/mq"
 	routes "auth_service/route"
 	"log"
 	"net/http"
@@ -14,10 +16,13 @@ func main() {
 
 	config.DBConnect()
 
+	mq.Init()
+	kafka.InitProducer()
+
 	// ClickHouse table yaratish (agar yo'q bo'lsa)
 	if err := clickhouse.InitAuditTable(); err != nil {
 		log.Printf("⚠️  ClickHouse init warning: %v", err)
-		// Fatal qilmaymiz — audit log ishlamasa ham asosiy servis ishlayversin
+
 	} else {
 		log.Println("✅ ClickHouse audit table ready")
 	}
@@ -27,10 +32,6 @@ func main() {
 	routes.RegisterRoutes(router)
 
 	log.Println("🚀 Server running on :8080")
-
-	// for _, route := range router.Routes {
-	// 	log.Println(route.Method, route.Path)
-	// }
 
 	log.Fatal(http.ListenAndServe(":8080", router.Router))
 }

@@ -3,7 +3,9 @@ package services
 import (
 	"auth_service/config"
 	"auth_service/helper"
+	"auth_service/kafka"
 	"auth_service/models"
+	"auth_service/mq"
 	"auth_service/request"
 	response "auth_service/responce"
 	"context"
@@ -61,6 +63,22 @@ func (s *authService) Register(name, email, password string) (string, error) {
 	if err != nil {
 		return "", err
 	}
+
+	mq.Publish("user_events", map[string]interface{}{
+		"type":    "rabbitMQ_user_registered",
+		"user_id": user.ID,
+		"name":    name,
+		"email":   email,
+		"role":    "user",
+	})
+
+	kafka.Publish(map[string]interface{}{
+		"type":    "user_registered",
+		"user_id": user.ID,
+		"name":    name,
+		"email":   email,
+		"role":    "user",
+	})
 
 	return helper.GenerateToken(user.ID, defaultRoleID)
 }
@@ -122,6 +140,7 @@ func (s *authService) Login(email, password string, roleID *int) (interface{}, e
 
 	// role_id berilgan - userni o'sha rolega egaligi tekshiriladi
 	selectedRoleID := *roleID
+
 	hasRole := false
 	for _, r := range roles {
 		if r.ID == selectedRoleID {
@@ -138,6 +157,20 @@ func (s *authService) Login(email, password string, roleID *int) (interface{}, e
 	if err != nil {
 		return nil, err
 	}
+
+	mq.Publish("user_events", map[string]interface{}{
+		"type":    "rabbitMQ_user_logged_in",
+		"user_id": user.ID,
+		"email":   email,
+		"role":    roles[selectedRoleID].Name,
+	})
+
+	kafka.Publish(map[string]interface{}{
+		"type":    "user_login",
+		"user_id": user.ID,
+		"email":   email,
+		"role_id": selectedRoleID,
+	})
 
 	return response.AuthResponse{Token: token}, nil
 }
